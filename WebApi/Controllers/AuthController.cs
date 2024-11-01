@@ -1,5 +1,6 @@
 ﻿using Application.DTOs;
 using Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebApi.Controllers
@@ -34,6 +35,21 @@ namespace WebApi.Controllers
         {
             var result = await _authService.RefreshTokenAsync(refreshToken);
             return Ok(result);
+        }
+
+        [Authorize]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            var refreshToken = Request.Headers["RefreshToken"]; // Получаем refresh token из заголовка
+
+            if (string.IsNullOrEmpty(refreshToken))
+                return BadRequest("Refresh token is required");
+
+            // Обновляем пользователя, устанавливая refresh token в null
+            await _authService.LogoutAsync(refreshToken);
+
+            return NoContent(); // Возвращаем статус 204 No Content
         }
     }
 }

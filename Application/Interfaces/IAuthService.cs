@@ -12,5 +12,6 @@ namespace Application.Interfaces
         Task<AuthResponseDto> RegisterAsync(RegisterRequestDto registerDto);
         Task<AuthResponseDto> AuthenticateAsync(LoginRequestDto loginDto);
         Task<AuthResponseDto> RefreshTokenAsync(string refreshToken);
+        Task LogoutAsync(string refreshToken);
     }
 }

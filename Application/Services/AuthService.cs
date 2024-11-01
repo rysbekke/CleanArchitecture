@@ -35,9 +35,12 @@ namespace Application.Services
             {
                 Username = registerDto.Username,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password),
-                RefreshToken = GenerateNewRefreshToken() // Убедитесь, что вы инициализируете значение
+                RefreshToken = GenerateNewRefreshToken() // Инициализация RefreshToken
             };
+
             await _userRepository.AddUserAsync(user);
+            // Сохраняем RefreshToken и его срок действия
+            await _userRepository.SaveRefreshTokenAsync(user.Username, user.RefreshToken, DateTime.UtcNow.AddDays(7));
 
             return await AuthenticateAsync(new LoginRequestDto { Username = registerDto.Username, Password = registerDto.Password });
         }
@@ -56,26 +59,31 @@ namespace Application.Services
             return authResponse;
         }
 
-        public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
+        public async Task LogoutAsync(string refreshToken)
         {
-            //var user = await _userRepository.GetUserByRefreshTokenAsync(refreshToken);
-            //if (user == null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            //    throw new Exception("Invalid refresh token");
-
-            //return GenerateTokens(user);
             var user = await _userRepository.GetUserByRefreshTokenAsync(refreshToken);
             if (user == null)
+                throw new Exception("Invalid refresh token");
+
+            // Устанавливаем refresh token в null или генерируем новый, чтобы аннулировать старый
+            user.RefreshToken = null; // Или можете создать новый токен
+            await _userRepository.UpdateUserAsync(user); // Сохраняем изменения в базе данных
+        }
+
+        public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
+        {
+            var user = await _userRepository.GetUserByRefreshTokenAsync(refreshToken);
+            if (user == null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
             {
                 throw new Exception("Invalid refresh token");
             }
 
-            // Генерируем новый токен
             var newAccessToken = GenerateAccessToken(user);
             var newRefreshToken = GenerateNewRefreshToken();
 
-            user.RefreshToken = newRefreshToken; // Устанавливаем новый refresh token
-            await _userRepository.UpdateUserAsync(user); // Сохраняем пользователя с новым refresh token
-            //await _unitOfWork.SaveAsync(); // Сохраняем изменения
+            user.RefreshToken = newRefreshToken; // Обновляем RefreshToken
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); // Обновляем срок действия
+            await _userRepository.UpdateUserAsync(user); // Сохраняем пользователя с новым RefreshToken
 
             return new AuthResponseDto
             {
@@ -89,13 +97,14 @@ namespace Application.Services
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(_configuration["JwtSettings:Secret"]);
 
+            // Генерация Access Token
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new Claim[]
                 {
-                    new Claim(ClaimTypes.Name, user.Username)
+                new Claim(ClaimTypes.Name, user.Username),
                 }),
-                Expires = DateTime.UtcNow.AddMinutes(30),
+                Expires = DateTime.UtcNow.AddMinutes(30), // Время жизни Access Token
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 
@@ -105,38 +114,33 @@ namespace Application.Services
             return new AuthResponseDto
             {
                 AccessToken = accessToken,
-                RefreshToken = Guid.NewGuid().ToString() // Could be a JWT or any unique identifier
+                RefreshToken = GenerateNewRefreshToken()
             };
         }
 
         private string GenerateNewRefreshToken()
         {
-            var randomNumber = new byte[32]; // Размер токена
+            var randomNumber = new byte[32];
             using (var rng = RandomNumberGenerator.Create())
             {
-                rng.GetBytes(randomNumber); // Генерируем случайные байты
-                return Convert.ToBase64String(randomNumber); // Преобразуем байты в строку
+                rng.GetBytes(randomNumber);
+                return Convert.ToBase64String(randomNumber);
             }
         }
 
         public string GenerateAccessToken(User user)
         {
-            // Устанавливаем время истечения токена
             var tokenExpiration = DateTime.UtcNow.AddMinutes(Convert.ToDouble(_configuration["JwtSettings:AccessTokenExpiration"]));
 
-            // Создаем claims для токена
             var claims = new[]
             {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.Username)
-            // Добавьте другие claims по необходимости
         };
 
-            // Генерируем ключ шифрования
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:Secret"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            // Создаем токен
             var token = new JwtSecurityToken(
                 issuer: _configuration["JwtSettings:Issuer"],
                 audience: _configuration["JwtSettings:Audience"],
@@ -145,7 +149,6 @@ namespace Application.Services
                 signingCredentials: creds
             );
 
-            // Возвращаем токен как строку
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }

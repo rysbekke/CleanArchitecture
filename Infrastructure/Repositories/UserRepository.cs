@@ -52,5 +52,15 @@ namespace Infrastructure.Repositories
         }
 
         // Добавьте другие методы для работы с пользователями, если нужно
+        public async Task SaveRefreshTokenAsync(string username, string refreshToken, DateTime expiryTime)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+            if (user != null)
+            {
+                user.RefreshToken = refreshToken;
+                user.RefreshTokenExpiryTime = expiryTime; // Убедитесь, что поле RefreshTokenExpiryTime существует в вашей модели User
+                await _context.SaveChangesAsync();
+            }
+        }
     }
 }

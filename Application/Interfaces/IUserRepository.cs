@@ -14,5 +14,6 @@ namespace Application.Interfaces
         Task AddUserAsync(User user);
         Task UpdateUserAsync(User user);
         Task DeleteUserAsync(User user);
+        Task SaveRefreshTokenAsync(string username, string refreshToken, DateTime expiryTime);
     }
 }
