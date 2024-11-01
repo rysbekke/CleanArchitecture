@@ -1,6 +1,6 @@
-﻿using Core.DTOs;
+﻿using Application.DTOs;
 using Core.Entities;
-using Core.Interfaces;
+using Application.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System;
