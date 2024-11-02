@@ -23,6 +23,10 @@
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "applicationUrl": "https://localhost:7207;http://localhost:5218",
+      "Certificate": {
+        "Path": "local.cer",
+        "Password": "<cert-password>"
+      },
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
@@ -34,5 +38,6 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     }
+
   }
 }
